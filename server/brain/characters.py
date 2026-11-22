@@ -31,7 +31,8 @@ from pathlib import Path
 
 DIR = Path(__file__).resolve().parent.parent / "characters"
 DEFAULT = "rocky"
-# Fish Audio models a character can use: "" sends no model header, so Fish picks its default (what Rocky uses).
+# Fish Audio models a character can use: "" sends no model header, so Fish picks its default (S2.1 Pro, paid).
+# Rocky uses config.TTS_MODEL.
 TTS_MODELS = ("", "drama-3", "s2.1-pro-free")     # s2.1-pro-free: S2.1 Pro on Fish's free tier (no API credit)
 ACTING_MODELS = ("drama-3",)     # models that perform [directions] and <whisper>...</whisper> instead of reading them
 LINE_KEYS = ("wake", "sleep", "track_on", "track_off")

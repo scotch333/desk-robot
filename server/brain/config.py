@@ -84,7 +84,7 @@ PORT = 8765
 # The console page has sliders for level / bass cut / presence that apply
 # live; set the winners here to keep them.
 TTS_VOICE_ID = "6dd07916890445e59c5f019ad0fc7879"
-TTS_MODEL = "s2.1-pro-free"    # Fish's model (its `model` header): "" = Fish's default, "drama-3" = Drama 3. A character sets its own
+TTS_MODEL = "s2.1-pro-free"    # Fish's model (its `model` header): "s2.1-pro-free" = S2.1 Pro on the free tier, "" = Fish's default (paid), "drama-3" = Drama 3. A character sets its own
 TTS_ACTING = False  # the voice model performs [directions] and <whisper>...</whisper> (Drama 3), so they're kept in
 TTS_TEMPERATURE = 0.4
 TTS_TOP_P = 0.6
