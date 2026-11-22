@@ -1201,7 +1201,8 @@ def console_state() -> dict:
         "hearing": ears.hearing if ears is not None else False,
         # the dashboard strip's bar: the whole last quarter second, not just its newest 32 ms
         **dict(zip(("level_recent", "speech_recent", "voice_recent"), ears.recent() if ears is not None else (0.0, 0.0, False))),
-        "speaking": ears.muted.is_set() if ears is not None else False,
+        # speech_now covers a reply spoken while the microphone is off (`listen`), when there are no ears to mute
+        "speaking": speech_now is not None or (ears.muted.is_set() if ears is not None else False),
         "thinking": thinking,
         "awake": now < awake_until,
         "awake_for": max(0.0, awake_until - now),

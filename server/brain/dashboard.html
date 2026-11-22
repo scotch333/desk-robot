@@ -63,6 +63,11 @@
            transition: border-color .4s, box-shadow .4s; }
   .bezel canvas { display: block; width: 192px; height: 96px; image-rendering: pixelated; border-radius: 6px;
                   animation: poweron .9s cubic-bezier(.2,.8,.2,1) both; }
+  /* /face: nothing but his face on a black stage (see FACE_ONLY in the script) */
+  html.faceonly, html.faceonly body { background: #000; overflow: hidden; }
+  html.faceonly body::before, html.faceonly .console, html.faceonly #sky { display: none; }
+  #facestage { position: fixed; inset: 0; display: grid; place-items: center; background: #000; cursor: pointer; }
+  #facestage canvas { display: block; width: min(96vw, 192vh); aspect-ratio: 2 / 1; height: auto; image-rendering: pixelated; }
   .bezel::after { content: ""; position: absolute; inset: 7px; border-radius: 6px; pointer-events: none;
                   background: repeating-linear-gradient(0deg, rgba(0,0,0,.28) 0 1px, transparent 1px 3px),
                               radial-gradient(120% 90% at 30% 20%, rgba(255,255,255,.07), transparent 60%); }
@@ -1355,6 +1360,17 @@ const FaceKit = (() => {
 <script>
 (() => {
   const $ = id => document.getElementById(id);
+  // /face: only his face, filling the window, for a computer with no robot (or a spare screen). It is the header's
+  // avatar canvas moved onto a black stage, so it draws with the same FaceKit and follows the same /status.
+  const FACE_ONLY = location.pathname === "/face";
+  if (FACE_ONLY) {
+    document.documentElement.classList.add("faceonly");
+    const stage = document.createElement("div");
+    stage.id = "facestage"; stage.title = "Click for full screen";
+    stage.append($("avatar"));
+    stage.onclick = () => document.fullscreenElement ? document.exitFullscreen() : stage.requestFullscreen?.();
+    document.body.append(stage);
+  }
   let NAME = "{name}";   // the active personality's name; setRobotName() changes it everywhere on the page
   function setRobotName(name) {
     if (!name || name === NAME) return;
@@ -1531,9 +1547,10 @@ const FaceKit = (() => {
   // the face as status says it is right now
   function mirrorFace(s) {
     const sim = live.avatar; if (!sim) return;
-    const on = server.running && !!s.robot;
+    const on = server.running && (!!s.robot || FACE_ONLY);   // /face is the face when there is no robot to show it
     if (s.emotion && live.pack?.looks[s.emotion]) { live.emotion = s.emotion; sim.setEmotion(s.emotion); }
-    sim.setAsleep(!on || !s.awake);
+    // a typed `ask` or `say` speaks without waking him; on /face he still opens his eyes for it
+    sim.setAsleep(!on || !(s.awake || (FACE_ONLY && (s.speaking || s.thinking))));
     sim.talking = on && !!s.speaking;
   }
   // ── the conversation, word by word: his words appear as his voice says them (status.speech gives his sentences
@@ -1706,7 +1723,7 @@ const FaceKit = (() => {
         if (r.ok) render(await r.json()); else showOffline();
       } catch { showOffline(); }
     }
-    setTimeout(tick, server.running && liveTab() && !document.hidden ? 200 : 1500);
+    setTimeout(tick, server.running && (liveTab() || FACE_ONLY) && !document.hidden ? 200 : 1500);
   }
   let pcSeen;   // the last computer action already shown (undefined until the first status)
   function render(s) {
