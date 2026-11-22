@@ -7,7 +7,7 @@ saved in server/characters/ (git-ignored; export one from the dashboard to share
       "name": "Juniper",                     also the wake word: "hey Juniper"
       "description": "...",                  what you asked for, kept so you can redo the draft
       "voice_id": "<32 hex>",                a Fish Audio voice (the ID in the voice's page address)
-      "tts_model": "drama-3",                Fish's model: "" = Fish's default (Rocky's), "drama-3" = Drama 3
+      "tts_model": "drama-3",                Fish's model: "" = Fish's default (S2.1 Pro, paid), "s2.1-pro-free" = the same on the free tier, "drama-3" = Drama 3
       "prompt": "...",                       who they are and how they talk ({human} = your name)
       "examples": "[happy] ...",             example replies, one per line, each starting with an emotion tag
       "lines": {"wake", "sleep", "track_on", "track_off"},   said without asking the language model
@@ -146,7 +146,7 @@ def name_of(cid: str) -> str:
 
 def list_all() -> list[dict]:
     out = [{"id": DEFAULT, "builtin": True, "character": {
-        "name": "Rocky", "tts_model": "",
+        "name": "Rocky", "tts_model": "s2.1-pro-free",     # keep in step with TTS_MODEL in config.py
         "description": "The Eridian engineer from Project Hail Mary. Built in: his personality is in "
                        "server/brain/personality.py."}}]
     for f in sorted(DIR.glob("*.json")) if DIR.is_dir() else []:
