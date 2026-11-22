@@ -67,6 +67,8 @@
   html.faceonly, html.faceonly body { background: #000; overflow: hidden; }
   html.faceonly body::before, html.faceonly .console, html.faceonly #sky { display: none; }
   #facestage { position: fixed; inset: 0; display: grid; place-items: center; background: #000; cursor: pointer; }
+  #faceswitch { position: absolute; right: 16px; bottom: 16px; opacity: .25; transition: opacity .2s; }
+  #faceswitch:hover, #faceswitch:focus-visible { opacity: 1; }
   #facestage canvas { display: block; width: min(96vw, 192vh); aspect-ratio: 2 / 1; height: auto; image-rendering: pixelated; }
   .bezel::after { content: ""; position: absolute; inset: 7px; border-radius: 6px; pointer-events: none;
                   background: repeating-linear-gradient(0deg, rgba(0,0,0,.28) 0 1px, transparent 1px 3px),
@@ -570,6 +572,7 @@
     </ul>
     <div class="server" id="serverbox" hidden>
       <span class="pill" id="serverpill" role="status">server —</span>
+      <button type="button" id="switchbtn" hidden title="Hand over to the next personality (restarts the server)">Switch</button>
       <button type="button" class="primary" id="startbtn">Start server</button>
       <button type="button" id="restartbtn">Restart</button>
       <button type="button" class="astro" id="stopbtn">Stop</button>
@@ -850,7 +853,8 @@
                 <p class="hint" id="c-voicehint">Open a voice on <a href="https://fish.audio/discovery/" target="_blank" rel="noopener">fish.audio</a> and copy the long ID from its address, or paste the whole address. Test voice plays a sample here on this computer.</p></div>
               <fieldset class="set"><legend class="k">Voice model</legend>
                 <div class="choices"><label><input type="radio" name="c-model" value="drama-3"> Drama 3 (acts: sighs, laughs, whispers)</label>
-                  <label><input type="radio" name="c-model" value=""> S2.1 Pro (standard: steady, natural reading)</label></div>
+                  <label><input type="radio" name="c-model" value=""> S2.1 Pro (standard: steady, natural reading)</label>
+                  <label><input type="radio" name="c-model" value="s2.1-pro-free"> S2.1 Pro Free (Fish's free tier: needs no API credit)</label></div>
                 <p class="hint">Drama 3 performs short directions the personality writes into its replies, like [small laugh] or &lt;whisper&gt;…&lt;/whisper&gt;. S2.1 Pro is Fish's standard model, the one Rocky uses: a calm, consistent read of the words with no acting directions.</p>
                 <p class="hint">Cost (Fish Audio's API, per million bytes of text, about 12 hours of speech): <b>Drama 3</b> $50, on sale for $10 until Nov 12, 2026, so about $7.50 per thousand replies ($1.50 on sale). <b>S2.1 Pro</b> $15, about $2.25 per thousand replies. A reply is about 150 bytes.</p></fieldset>
               <div class="set"><label class="k" for="c-desc">Describe the personality</label>
@@ -2261,7 +2265,7 @@ const FaceKit = (() => {
   const cstate = { list: [], active: "rocky", sel: "rocky", isNew: false, saved: null, dirty: false, external: false };
   const charOf = id => cstate.list.find(c => c.id === id);
   const LINE_KEYS = ["wake", "sleep", "track_on", "track_off"];
-  const MODEL_NAMES = { "": "S2.1 Pro", "drama-3": "Drama 3" };
+  const MODEL_NAMES = { "": "S2.1 Pro", "drama-3": "Drama 3", "s2.1-pro-free": "S2.1 Pro Free" };
   async function loadChars(selectId) {
     try {
       const r = await fetch("/launcher/characters");
@@ -2269,12 +2273,30 @@ const FaceKit = (() => {
       const j = await r.json();
       cstate.list = j.characters.filter(c => c.character); cstate.active = j.active; cstate.external = j.external;
       $("charsnolauncher").hidden = true; $("charsbody").hidden = false;
-      renderCharList();
+      renderCharList(); renderSwitch();
       if (!cstate.isNew || selectId) selectChar(selectId || (charOf(cstate.sel) ? cstate.sel : cstate.active), true);
     } catch {
       $("charsnolauncher").hidden = false; $("charsbody").hidden = true;
     }
   }
+  // Quick switch: one button that hands over to the next personality, in the header and in a corner of /face
+  const switchBtns = [$("switchbtn")];
+  if (FACE_ONLY) {
+    const b = document.createElement("button"); b.type = "button"; b.id = "faceswitch"; b.hidden = true;
+    $("facestage").append(b); switchBtns.push(b);
+  }
+  const nextChar = () => cstate.list.length > 1 ? cstate.list[(cstate.list.findIndex(c => c.id === cstate.active) + 1) % cstate.list.length] : null;
+  function renderSwitch() {
+    const n = nextChar();
+    for (const b of switchBtns) { b.hidden = !n; if (n) b.textContent = "Switch to " + n.character.name; }
+  }
+  for (const b of switchBtns) b.onclick = async e => {
+    e.stopPropagation();     // on /face a click on the stage is full screen
+    const n = nextChar(); if (!n) return;
+    for (const x of switchBtns) x.disabled = true;
+    try { await useChar(n.id); } catch (err) { toast(err.message, true); }
+    for (const x of switchBtns) x.disabled = false;
+  };
   function renderCharList() {
     const box = $("charlist"); box.innerHTML = "";
     for (const c of cstate.list) {
@@ -2486,6 +2508,7 @@ const FaceKit = (() => {
   clock(); setInterval(clock, 1000);
   const first = $({ "#settings": "t-settings", "#personalities": "t-chars", "#faces": "t-faces", "#log": "t-log" }[location.hash] || store.get("rocky-tab") || "t-live");
   selectTab(first || tabs[0]);
+  if (first?.id !== "t-chars") loadChars();   // for the Switch button (the Personalities tab loads them itself)
 })();
 </script>
 </body>
