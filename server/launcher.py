@@ -304,7 +304,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         url = urllib.parse.urlparse(self.path)
         q = urllib.parse.parse_qs(url.query)
-        if url.path == "/":
+        if url.path in ("/", "/face"):   # /face is the same page; its script shows only the face, full window
             try:
                 page = PAGE.read_text().replace("{name}", active_name()).encode()
             except OSError as e:

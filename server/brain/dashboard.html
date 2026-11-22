@@ -63,6 +63,13 @@
            transition: border-color .4s, box-shadow .4s; }
   .bezel canvas { display: block; width: 192px; height: 96px; image-rendering: pixelated; border-radius: 6px;
                   animation: poweron .9s cubic-bezier(.2,.8,.2,1) both; }
+  /* /face: nothing but his face on a black stage (see FACE_ONLY in the script) */
+  html.faceonly, html.faceonly body { background: #000; overflow: hidden; }
+  html.faceonly body::before, html.faceonly .console, html.faceonly #sky { display: none; }
+  #facestage { position: fixed; inset: 0; display: grid; place-items: center; background: #000; cursor: pointer; }
+  #faceswitch { position: absolute; right: 16px; bottom: 16px; opacity: .25; transition: opacity .2s; }
+  #faceswitch:hover, #faceswitch:focus-visible { opacity: 1; }
+  #facestage canvas { display: block; width: min(96vw, 192vh); aspect-ratio: 2 / 1; height: auto; image-rendering: pixelated; }
   .bezel::after { content: ""; position: absolute; inset: 7px; border-radius: 6px; pointer-events: none;
                   background: repeating-linear-gradient(0deg, rgba(0,0,0,.28) 0 1px, transparent 1px 3px),
                               radial-gradient(120% 90% at 30% 20%, rgba(255,255,255,.07), transparent 60%); }
@@ -565,6 +572,7 @@
     </ul>
     <div class="server" id="serverbox" hidden>
       <span class="pill" id="serverpill" role="status">server —</span>
+      <button type="button" id="switchbtn" hidden title="Hand over to the next personality (restarts the server)">Switch</button>
       <button type="button" class="primary" id="startbtn">Start server</button>
       <button type="button" id="restartbtn">Restart</button>
       <button type="button" class="astro" id="stopbtn">Stop</button>
@@ -845,9 +853,10 @@
                 <p class="hint" id="c-voicehint">Open a voice on <a href="https://fish.audio/discovery/" target="_blank" rel="noopener">fish.audio</a> and copy the long ID from its address, or paste the whole address. Test voice plays a sample here on this computer.</p></div>
               <fieldset class="set"><legend class="k">Voice model</legend>
                 <div class="choices"><label><input type="radio" name="c-model" value="drama-3"> Drama 3 (acts: sighs, laughs, whispers)</label>
-                  <label><input type="radio" name="c-model" value=""> S2.1 Pro (standard: steady, natural reading)</label></div>
-                <p class="hint">Drama 3 performs short directions the personality writes into its replies, like [small laugh] or &lt;whisper&gt;…&lt;/whisper&gt;. S2.1 Pro is Fish's standard model, the one Rocky uses: a calm, consistent read of the words with no acting directions.</p>
-                <p class="hint">Cost (Fish Audio's API, per million bytes of text, about 12 hours of speech): <b>Drama 3</b> $50, on sale for $10 until Nov 12, 2026, so about $7.50 per thousand replies ($1.50 on sale). <b>S2.1 Pro</b> $15, about $2.25 per thousand replies. A reply is about 150 bytes.</p></fieldset>
+                  <label><input type="radio" name="c-model" value=""> S2.1 Pro (standard: steady, natural reading)</label>
+                  <label><input type="radio" name="c-model" value="s2.1-pro-free"> S2.1 Pro Free (Fish's free tier: needs no API credit)</label></div>
+                <p class="hint">Drama 3 performs short directions the personality writes into its replies, like [small laugh] or &lt;whisper&gt;…&lt;/whisper&gt;. S2.1 Pro is Fish's standard model: a calm, consistent read of the words with no acting directions. S2.1 Pro Free is the same model on Fish's free tier, the one Rocky uses here.</p>
+                <p class="hint">Cost (Fish Audio's API, per million bytes of text, about 12 hours of speech): <b>Drama 3</b> $50, on sale for $10 until Nov 12, 2026, so about $7.50 per thousand replies ($1.50 on sale). <b>S2.1 Pro</b> $15, about $2.25 per thousand replies. <b>S2.1 Pro Free</b> uses no API credit; Fish sets its limits. A reply is about 150 bytes.</p></fieldset>
               <div class="set"><label class="k" for="c-desc">Describe the personality</label>
                 <textarea id="c-desc" rows="4" maxlength="1000" placeholder="A dramatic old sea captain who's suspicious of technology and tells too many stories about the sea."></textarea>
                 <div class="row"><button type="button" class="primary" id="c-draft">Write it for me</button></div>
@@ -1355,6 +1364,17 @@ const FaceKit = (() => {
 <script>
 (() => {
   const $ = id => document.getElementById(id);
+  // /face: only his face, filling the window, for a computer with no robot (or a spare screen). It is the header's
+  // avatar canvas moved onto a black stage, so it draws with the same FaceKit and follows the same /status.
+  const FACE_ONLY = location.pathname === "/face";
+  if (FACE_ONLY) {
+    document.documentElement.classList.add("faceonly");
+    const stage = document.createElement("div");
+    stage.id = "facestage"; stage.title = "Click for full screen";
+    stage.append($("avatar"));
+    stage.onclick = () => document.fullscreenElement ? document.exitFullscreen() : stage.requestFullscreen?.()?.catch(() => {});
+    document.body.append(stage);
+  }
   let NAME = "{name}";   // the active personality's name; setRobotName() changes it everywhere on the page
   function setRobotName(name) {
     if (!name || name === NAME) return;
@@ -1463,6 +1483,7 @@ const FaceKit = (() => {
       if (!r.ok) throw new Error("no launcher");
       const s = await r.json();
       server = { launcher: true, running: s.running || s.external, external: s.external, uptime: s.uptime_s };
+      if (s.name !== NAME && !cstate.dirty && !cstate.isNew) loadChars();   // switched from another window: the Switch button follows
       setRobotName(s.name);
     } catch { server = { launcher: false, running: true }; }   // served by the brain itself: it's running
     $("serverbox").hidden = !server.launcher;
@@ -1531,9 +1552,10 @@ const FaceKit = (() => {
   // the face as status says it is right now
   function mirrorFace(s) {
     const sim = live.avatar; if (!sim) return;
-    const on = server.running && !!s.robot;
+    const on = server.running && (!!s.robot || FACE_ONLY);   // /face is the face when there is no robot to show it
     if (s.emotion && live.pack?.looks[s.emotion]) { live.emotion = s.emotion; sim.setEmotion(s.emotion); }
-    sim.setAsleep(!on || !s.awake);
+    // a typed `ask` or `say` speaks without waking him; on /face he still opens his eyes for it
+    sim.setAsleep(!on || !(s.awake || (FACE_ONLY && (s.speaking || s.thinking))));
     sim.talking = on && !!s.speaking;
   }
   // ── the conversation, word by word: his words appear as his voice says them (status.speech gives his sentences
@@ -1563,7 +1585,7 @@ const FaceKit = (() => {
     el.replaceChildren(...parts); el.classList.toggle("typing", live);
   }
   function drawWords(now) {
-    const hw = split(words.heard), n = words.typed ? hw.length : Math.min(hw.length, Math.floor((now - words.heardAt) / TYPE_MS) + 1);
+    const hw = split(words.heard || ""), n = words.typed ? hw.length : Math.min(hw.length, Math.floor((now - words.heardAt) / TYPE_MS) + 1);
     if (n >= hw.length) words.typed = true;
     showLine($("heard"), "heard", hw.slice(0, n).join(" "), "", n < hw.length);
     const sp = words.speech;
@@ -1706,7 +1728,7 @@ const FaceKit = (() => {
         if (r.ok) render(await r.json()); else showOffline();
       } catch { showOffline(); }
     }
-    setTimeout(tick, server.running && liveTab() && !document.hidden ? 200 : 1500);
+    setTimeout(tick, server.running && (liveTab() || FACE_ONLY) && !document.hidden ? 200 : 1500);
   }
   let pcSeen;   // the last computer action already shown (undefined until the first status)
   function render(s) {
@@ -2244,7 +2266,7 @@ const FaceKit = (() => {
   const cstate = { list: [], active: "rocky", sel: "rocky", isNew: false, saved: null, dirty: false, external: false };
   const charOf = id => cstate.list.find(c => c.id === id);
   const LINE_KEYS = ["wake", "sleep", "track_on", "track_off"];
-  const MODEL_NAMES = { "": "S2.1 Pro", "drama-3": "Drama 3" };
+  const MODEL_NAMES = { "": "S2.1 Pro", "drama-3": "Drama 3", "s2.1-pro-free": "S2.1 Pro Free" };
   async function loadChars(selectId) {
     try {
       const r = await fetch("/launcher/characters");
@@ -2252,12 +2274,30 @@ const FaceKit = (() => {
       const j = await r.json();
       cstate.list = j.characters.filter(c => c.character); cstate.active = j.active; cstate.external = j.external;
       $("charsnolauncher").hidden = true; $("charsbody").hidden = false;
-      renderCharList();
+      renderCharList(); renderSwitch();
       if (!cstate.isNew || selectId) selectChar(selectId || (charOf(cstate.sel) ? cstate.sel : cstate.active), true);
     } catch {
       $("charsnolauncher").hidden = false; $("charsbody").hidden = true;
     }
   }
+  // Quick switch: one button that hands over to the next personality, in the header and in a corner of /face
+  const switchBtns = [$("switchbtn")];
+  if (FACE_ONLY) {
+    const b = document.createElement("button"); b.type = "button"; b.id = "faceswitch"; b.hidden = true;
+    $("facestage").append(b); switchBtns.push(b);
+  }
+  const nextChar = () => cstate.list.length > 1 ? cstate.list[(cstate.list.findIndex(c => c.id === cstate.active) + 1) % cstate.list.length] : null;
+  function renderSwitch() {
+    const n = nextChar();
+    for (const b of switchBtns) { b.hidden = !n; if (n) b.textContent = "Switch to " + n.character.name; }
+  }
+  for (const b of switchBtns) b.onclick = async e => {
+    e.stopPropagation();     // on /face a click on the stage is full screen
+    const n = nextChar(); if (!n || !confirmCharDiscard()) return;
+    for (const x of switchBtns) x.disabled = true;
+    try { await useChar(n.id); } catch (err) { toast(err.message, true); }
+    for (const x of switchBtns) x.disabled = false;
+  };
   function renderCharList() {
     const box = $("charlist"); box.innerHTML = "";
     for (const c of cstate.list) {
@@ -2469,6 +2509,7 @@ const FaceKit = (() => {
   clock(); setInterval(clock, 1000);
   const first = $({ "#settings": "t-settings", "#personalities": "t-chars", "#faces": "t-faces", "#log": "t-log" }[location.hash] || store.get("rocky-tab") || "t-live");
   selectTab(first || tabs[0]);
+  if (first?.id !== "t-chars") loadChars();   // for the Switch button (the Personalities tab loads them itself)
 })();
 </script>
 </body>

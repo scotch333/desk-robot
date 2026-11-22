@@ -289,7 +289,11 @@ To have the dashboard there whenever you log in, run
 
 ### The dashboard
 
-<http://localhost:8766/> has five tabs, and only answers this computer:
+<http://localhost:8766/> has five tabs, and only answers this computer.
+<http://localhost:8766/face> is the same page showing only his face, filling
+the window (click it for full screen): a face for a computer with no robot.
+**Switch to …** in the header, and in a corner of `/face`, hands over to the
+next personality.
 
 - **Live**: what Rocky sees and hears, the last exchange, and buttons for
   his head, face, sleep, words to say, and a focus session. **Start server**, **Restart** and

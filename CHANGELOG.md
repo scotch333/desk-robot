@@ -3,6 +3,19 @@
 Each version of the robot is a git tag and a GitHub Release. `main` is the
 latest work. A video matches the tagged version it was made with.
 
+## Unreleased
+
+Software:
+
+- `http://localhost:8766/face`: his live face, full window, for a computer
+  with no robot connected.
+- A **Switch to …** button in the dashboard header and on `/face` hands over
+  to the next personality.
+- Rocky's voice now uses Fish Audio's free model (`s2.1-pro-free`), so it
+  needs no API credit; `TTS_MODEL = ""` in `server/brain/config.py` goes back
+  to the paid default. Personalities can pick **S2.1 Pro Free** too.
+- The dashboard shows him speaking when the microphone is off.
+
 ## v2.1 - 2026-11-06
 
 Software:
