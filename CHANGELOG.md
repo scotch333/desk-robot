@@ -11,6 +11,11 @@ Software:
   with no robot connected.
 - A **Switch to …** button in the dashboard header and on `/face` hands over
   to the next personality.
+- Say "hey Rocky, switch to <name>" (or "switch personality") to hand over
+  by voice. With the dashboard launcher he restarts as the new personality;
+  started by hand, the choice is saved for the next start.
+- `hear <words>` in the console acts as if he heard them, to try spoken
+  commands with no microphone.
 - Rocky's voice now uses Fish Audio's free model (`s2.1-pro-free`), so it
   needs no API credit; `TTS_MODEL = ""` in `server/brain/config.py` goes back
   to the paid default. Personalities can pick **S2.1 Pro Free** too.

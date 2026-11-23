@@ -157,6 +157,36 @@ def list_all() -> list[dict]:
     return out
 
 
+_SWITCH_TO = r"\b(?:switch|change|swap|hand over|go back)(?: back| over)?(?: to| into| the)? "
+_SWITCH_END = r"(?: now)?(?: please)?$"     # the command ends the line: "switch to jarvis and ..." is a sentence
+_SWITCH_NEXT = re.compile(r"\b(?:switch|change|swap)(?: your| the)? "
+                          r"(?:personality|personalities|character|characters|voice|voices)" + _SWITCH_END)
+
+
+def _spoken(name: str) -> str:
+    """A name as ears.normalize writes it: "Jean-Luc" -> "jean luc"."""
+    return " ".join(re.sub(r"[^a-z' ]+", " ", name.lower()).split())
+
+
+def spoken_switch(heard: str, current: str) -> str | None:
+    """The id of the personality a spoken line asks for, or None: "switch to Jarvis", "change back to Rocky",
+    or "switch personality" for the next one. `heard` is lowercase words with no punctuation (ears.normalize)."""
+    if len(heard.split()) > 12:      # a command, not a sentence that happens to hold the words
+        return None
+    people = [c for c in list_all() if c.get("character")]
+    for c in people:
+        ch = c["character"]
+        # the name, and what speech-to-text writes for it (each wake word without its greeting: "hey jervis")
+        names = {_spoken(ch["name"]), *(w.split(maxsplit=1)[-1] for w in ch.get("wake_words", []))}
+        alts = "|".join(re.escape(n) for n in sorted(names, key=len, reverse=True))
+        if c["id"] != current and re.search(_SWITCH_TO + rf"(?:{alts})" + _SWITCH_END, heard):
+            return c["id"]
+    if len(people) > 1 and _SWITCH_NEXT.search(heard):
+        ids = [c["id"] for c in people]
+        return ids[(ids.index(current) + 1) % len(ids)] if current in ids else ids[0]
+    return None
+
+
 def slug(name: str) -> str:
     s = re.sub(r"[^a-z0-9]+", "-", (name or "").lower()).strip("-")[:40]
     return s if s and s != DEFAULT else "character"
