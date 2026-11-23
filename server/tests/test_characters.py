@@ -1,6 +1,9 @@
 """Characters made in the dashboard: checking, the prompt they become, and the acting cues of Drama 3 voices."""
 
+import tempfile
 import unittest
+from pathlib import Path
+from unittest import mock
 
 from brain import characters, config, faces, mouth, personality, thinking
 
@@ -30,6 +33,25 @@ class CleanTest(unittest.TestCase):
                     dict(prompt="short"), dict(lines={"wake": "Aye?"}), dict(wake_words=["juniper"])):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 characters.clean(sample(**bad))
+
+    def test_spoken_switch(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(characters, "DIR", Path(d)):
+            cid = characters.save(sample())
+            f = characters.spoken_switch
+            self.assertEqual(f("switch to juniper", "rocky"), cid)
+            self.assertEqual(f("can you change back to rocky please", cid), "rocky")
+            self.assertEqual(f("change the rocky", cid), "rocky")            # what Whisper wrote for "change to Rocky"
+            self.assertEqual(f("switch personality", "rocky"), cid)
+            self.assertEqual(f("swap voices", cid), "rocky")
+            self.assertIsNone(f("switch to juniper", cid))                   # already them
+            self.assertIsNone(f("tell me about juniper trees", "rocky"))
+            self.assertIsNone(f("change the units to celsius", "rocky"))
+            self.assertIsNone(f("can you change the lights rocky", cid))
+            self.assertIsNone(f("go back to sleep rocky", cid))
+            self.assertIsNone(f("can you change the volume of your voice", "rocky"))
+            self.assertIsNone(f("i want to change characters in my story", "rocky"))
+            self.assertEqual(f("hey rocky switch to juniper please", "rocky"), cid)
+            self.assertIsNone(f("i was going to switch jobs but then rocky said the personality of the place was good", cid))
 
     def test_examples_start_with_a_face(self):
         f = lambda s: characters._face_first(s, faces.EMOTIONS)

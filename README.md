@@ -293,7 +293,8 @@ To have the dashboard there whenever you log in, run
 <http://localhost:8766/face> is the same page showing only his face, filling
 the window (click it for full screen): a face for a computer with no robot.
 **Switch to …** in the header, and in a corner of `/face`, hands over to the
-next personality.
+next personality. So does saying it: "hey Rocky, switch to Jarvis", or
+"switch personality" for the next one.
 
 - **Live**: what Rocky sees and hears, the last exchange, and buttons for
   his head, face, sleep, words to say, and a focus session. **Start server**, **Restart** and
@@ -386,6 +387,7 @@ Server console commands, for when talking is inconvenient:
 ```
 ask <question>       talk to Rocky from the keyboard
 say <text>           speak exactly this
+hear <words>         act as if he heard this (start with "hey Rocky" unless he is awake)
 volume 0.5           speaker volume, 0 to 1
 listen               toggle the microphone
 mic                  three-second level meter

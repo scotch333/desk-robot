@@ -18,6 +18,7 @@ the rest of what you're saying, then answers once.
 Console commands:
   ask <question>   send a question to the brain, print and speak the reply
   say <text>       speak text (robot speaker if connected, else the Mac)
+  hear <words>     as if heard: try spoken commands ("hey rocky, switch to jarvis") with no microphone
   volume <0-1>     set the robot's speaker volume
   track on|off     face tracking (head follows you)
   listen           toggle listening on the microphone
@@ -45,7 +46,7 @@ import time
 
 import websockets
 
-from . import computer, config, decisions, faces, mouth, personality, settings
+from . import characters, computer, config, decisions, faces, mouth, personality, settings
 from . import focus as focus_mode
 from .body import Body
 from .dance import Dancer, length as dance_length
@@ -344,6 +345,13 @@ async def handle_console_line(line: str) -> bool:
             print("usage: ask <question>")
             return True
         await converse(arg)
+    elif cmd == "hear":
+        # as if he heard it, wake word and all: tries the spoken commands ("hey Rocky, track me") with no microphone
+        if not arg:
+            print("usage: hear <words>")
+            return True
+        now = time.time()
+        heard.put_nowait((arg, now, now, now))
     elif cmd == "listen":
         if ears is None:
             await start_listening()
@@ -362,7 +370,7 @@ async def handle_console_line(line: str) -> bool:
         except ValueError:
             print("usage: volume <0.0-1.0>")
     else:
-        print("commands: ask <q> | say <text> | volume <0-1> | listen | mic | track on|off | emo <name> | gesture <name> | pan <deg> | tilt <deg> | status | quit")
+        print("commands: ask <q> | say <text> | hear <words> | volume <0-1> | listen | mic | track on|off | emo <name> | gesture <name> | pan <deg> | tilt <deg> | status | quit")
     return True
 
 
@@ -1502,6 +1510,42 @@ async def _next_heard() -> tuple[str, float, float, float] | None:
                 return None
 
 
+def _ask_launcher_to_switch(port: str, cid: str) -> bool:
+    """Ask the launcher that started us to switch personality. It restarts the brain, so on success this call
+    usually never returns: we are told to quit while it waits."""
+    import http.client
+    try:
+        c = http.client.HTTPConnection("127.0.0.1", int(port), timeout=20)
+        c.request("POST", "/launcher/characters/use", json.dumps({"id": cid}),
+                  {"Host": f"localhost:{port}", "X-Rocky-Console": "1", "Content-Type": "application/json"})
+        r = c.getresponse()
+        return r.status == 200 and json.loads(r.read() or b"{}").get("restarted") is True
+    except Exception:            # anything at all: the caller waits for an answer, so there must always be one
+        return False
+
+
+async def switch_character(cid: str) -> None:
+    """ "Switch to Jarvis": say so, then hand over. Under the launcher that is a restart as the new personality;
+    started by hand, the choice is saved for the next start."""
+    name = characters.name_of(cid)
+    line = f"Handing over to {name}."
+    print(f"{config.ROBOT_NAME} [neutral]: {line}")
+    await send_to_robot({"type": "emotion", "name": "neutral"})
+    await say(line)
+    port = os.environ.get("ROCKY_LAUNCHER_PORT")
+    if port:
+        # A daemon thread, not the loop's executor: the launcher answers only after we have quit, and asyncio
+        # waits for executor threads on the way out.
+        answer: list[bool] = []
+        threading.Thread(target=lambda: answer.append(_ask_launcher_to_switch(port, cid)), daemon=True).start()
+        while not answer:
+            await asyncio.sleep(0.2)     # normally we are told to quit while waiting here
+        if answer[0]:
+            return
+    settings.update({"character": {"id": cid}})
+    print(f"({name} is picked: restart the server to switch)")
+
+
 async def voice_loop() -> None:
     """Turns what the ears hear into conversations. A bug in one turn must
     not kill the loop (then nothing you say would get through), so each turn
@@ -1540,6 +1584,10 @@ async def _handle_heard(item: tuple[str, float, float, float]) -> None:
     awake_until = time.time() + config.AWAKE_SECONDS  # anything you say keeps him up
     norm = normalize(text)
     lines = personality.LINES
+    switch_to = characters.spoken_switch(norm, config.CHARACTER_ID)
+    if switch_to:
+        await switch_character(switch_to)
+        return
     if any(p in norm for p in config.TRACK_ON_PHRASES) and not any(p in norm for p in config.TRACK_OFF_PHRASES):
         if woke:
             await wake_up()
@@ -1591,6 +1639,10 @@ async def _handle_heard(item: tuple[str, float, float, float]) -> None:
         text, started_at, ended_at, heard_at = item
         _, more = strip_wake_word(text)
         print(f"{config.HUMAN_NAME}: {text}")
+        switch_to = characters.spoken_switch(normalize(text), config.CHARACTER_ID)
+        if switch_to:     # said while he was thinking: a command, not the rest of the question
+            await switch_character(switch_to)
+            return
         question = f"{question} {more}".strip()
         eyes.last_heard = question
         awake_until = time.time() + config.AWAKE_SECONDS

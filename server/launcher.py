@@ -106,7 +106,7 @@ class Brain:
             return "already running"
         if self.external():
             return "a brain started elsewhere is already running"
-        env = dict(LAUNCH_ENV, PYTHONUNBUFFERED="1")
+        env = dict(LAUNCH_ENV, PYTHONUNBUFFERED="1", ROCKY_LAUNCHER_PORT=str(PORT))   # the port: so "switch to <name>" can ask us to restart it
         self.log("── launcher: starting the server ──")
         self.proc = subprocess.Popen(
             [brain_python(), "-u", "-m", "brain.main"], cwd=HERE, env=env, text=True, bufsize=1,
