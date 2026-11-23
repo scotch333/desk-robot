@@ -187,7 +187,6 @@ def spoken_switch(heard: str, current: str) -> str | None:
     return None
 
 
-
 def slug(name: str) -> str:
     s = re.sub(r"[^a-z0-9]+", "-", (name or "").lower()).strip("-")[:40]
     return s if s and s != DEFAULT else "character"
